@@ -767,7 +767,90 @@ function ResultsTable({ data }) {
 - Requires Mantine UI as dependency
 - Less flexible styling if not using Mantine
 
-> **Decision**: Use TanStack Table if you want full control and minimal dependencies. Use Mantine DataTable if you want faster setup and are okay adopting Mantine UI.
+### Alternative: MUI DataGrid
+
+If your users need **high information density**, MUI DataGrid has an excellent dense mode that packs more rows on screen:
+
+```typescript
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
+
+const columns: GridColDef[] = [
+  { field: 'item_number', headerName: 'Item', width: 90 },
+  { field: 'store_number', headerName: 'Store', width: 90 },
+  { field: 'wos_weeks', headerName: 'WOS', width: 70 },
+  { field: 'whse_packs_distro', headerName: 'Packs', width: 80, type: 'number' },
+  { field: 'eaches_distro', headerName: 'Eaches', width: 80, type: 'number' },
+  {
+    field: 'retail_amount',
+    headerName: 'Retail $',
+    width: 100,
+    type: 'number',
+    valueFormatter: (params) => `$${params.value?.toFixed(2)}`
+  },
+];
+
+function ResultsTable({ data }) {
+  return (
+    <DataGrid
+      rows={data}
+      columns={columns}
+      density="compact"           // Dense mode - key for information density!
+      pageSizeOptions={[25, 50, 100, 250]}
+      initialState={{
+        pagination: { paginationModel: { pageSize: 100 } },
+      }}
+      disableRowSelectionOnClick
+      sortingMode="client"
+      filterMode="client"
+      // Column features
+      disableColumnMenu={false}
+      columnVisibilityModel={{}}  // Users can show/hide columns
+    />
+  );
+}
+```
+
+**MUI DataGrid Density Modes:**
+```typescript
+// "comfortable" - default, more spacing
+// "standard"    - balanced
+// "compact"     - dense, maximum rows visible (recommended for analysts)
+
+<DataGrid density="compact" ... />
+```
+
+**MUI DataGrid Pros:**
+- Built-in **dense/compact mode** - fits more data on screen
+- Column resizing, reordering, pinning (Community)
+- Excellent keyboard navigation
+- Mature, well-documented
+- Large ecosystem (if already using MUI)
+
+**MUI DataGrid Cons:**
+- Excel export requires Pro license ($249/dev/year) - use SheetJS instead
+- Heavier bundle than TanStack (~40kb vs ~15kb)
+- MUI dependency if not already using it
+
+**MUI + SheetJS for Excel Export:**
+```typescript
+import * as XLSX from 'xlsx';
+
+function ExportButton({ rows }) {
+  const handleExport = () => {
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Results');
+    XLSX.writeFile(wb, 'SSO_Results.xlsx');
+  };
+
+  return <Button onClick={handleExport}>Export to Excel</Button>;
+}
+```
+
+> **Decision Guide**:
+> - **TanStack Table** - Full control, minimal bundle, any design system
+> - **Mantine DataTable** - Fast setup, beautiful defaults, Mantine ecosystem
+> - **MUI DataGrid** - Dense mode for information-heavy views, MUI ecosystem
 
 ---
 
