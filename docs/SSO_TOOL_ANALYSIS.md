@@ -161,6 +161,7 @@ Department = 29                      # Walmart department number
 
 # WOS (Weeks of Supply) Targets
 WOS_targets = list(range(1,14))     # Calculate for 1-13 weeks of supply
+max_units = 4                        # User-provided cap on units per store-item (REQUIRED)
 
 # Forecast Settings
 forecast_trigger = 'on'              # 'on' = use forecast data
@@ -237,7 +238,7 @@ F4 Pipe = on_hand + in_transit + in_warehouse + on_order
 ```
 For each WOS target (1-13):
   WOS_target_qty = avg_sales × WOS_target
-  WOS_target_qty = MIN(4, WOS_target_qty)  # Cap at 4 units
+  WOS_target_qty = MIN(user_max_units, WOS_target_qty)  # Cap at user-provided max
   need = WOS_target_qty - F4_Pipe
   order_packs = round_to_warehouse_pack(need)
   order_eaches = order_packs × warehouse_pack_qty
@@ -285,10 +286,11 @@ Rounds need to warehouse pack quantities with special rounding rules.
 # ratio >= 1       → round(ratio)
 ```
 
-#### `calculate_wos_target(avg_sales: float, wos_weeks: int, cap: int = 4) -> float`
+#### `calculate_wos_target(avg_sales: float, wos_weeks: int, max_units: int) -> float`
 Calculates target inventory level.
 ```python
-# target = min(avg_sales * wos_weeks, cap)
+# target = min(avg_sales * wos_weeks, max_units)
+# max_units is user-provided (required parameter, no default)
 ```
 
 #### `calculate_pipeline(on_hand: float, in_transit: float, in_warehouse: float, on_order: float) -> float`
@@ -405,7 +407,7 @@ Retrieves past runs for display.
 │  ┌─────────────────────────────────────────────────────────────────┐  │
 │  │  FOR EACH WOS TARGET (1-13):                                    │  │
 │  │                                                                  │  │
-│  │    1. Calculate target inventory (avg_sales × WOS, capped at 4) │  │
+│  │    1. Calculate target inventory (avg_sales × WOS, user max cap)│  │
 │  │    2. Calculate need (target - pipeline)                        │  │
 │  │    3. Round to warehouse packs                                   │  │
 │  │    4. Apply minimum pack override                                │  │
@@ -454,7 +456,7 @@ Retrieves past runs for display.
   - `>= 1 pack` → standard rounding
 
 ### Caps & Limits
-- WOS target is capped at 4 units max (hardcoded)
+- WOS target is capped at user-provided maximum units (required input)
 - Minimum 1 pack sent if current pipeline ≤ 1
 
 ### Exclusions
@@ -503,7 +505,7 @@ warnings:
 
 ### Hardcoded Values to Make Configurable
 1. `FC_stores_to_remove` list → Store in database, make editable
-2. WOS cap of 4 → Make configurable per supplier
+2. ~~WOS cap of 4~~ → Now a required user input (max_units)
 3. Minimum pack override threshold (1) → Make configurable
 4. File paths → Replace with database queries / uploads
 
