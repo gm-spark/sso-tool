@@ -748,6 +748,10 @@ function ResultsTable({ data }) {
         { accessor: 'eaches_distro', title: 'Eaches', sortable: true },
       ]}
       records={data}
+      // Compact mode for information density
+      verticalSpacing="xs"    // xs, sm, md, lg, xl - "xs" is most compact
+      fz="sm"                 // font size - "sm" or "xs" for dense display
+      // Standard features
       pagination
       recordsPerPage={100}
       sortable
@@ -757,10 +761,23 @@ function ResultsTable({ data }) {
 }
 ```
 
+**Mantine DataTable Density Options:**
+```typescript
+// Compact (maximum density)
+<DataTable verticalSpacing="xs" fz="xs" ... />
+
+// Balanced
+<DataTable verticalSpacing="sm" fz="sm" ... />
+
+// Comfortable (default)
+<DataTable verticalSpacing="md" fz="md" ... />
+```
+
 **Mantine DataTable Pros:**
 - Zero config, works out of the box
 - Beautiful default styling (Mantine design system)
 - Built-in row expansion, selection, infinite scroll
+- **Granular density control** (5 levels vs MUI's 3)
 - Great documentation
 
 **Mantine DataTable Cons:**
@@ -849,8 +866,8 @@ function ExportButton({ rows }) {
 
 > **Decision Guide**:
 > - **TanStack Table** - Full control, minimal bundle, any design system
-> - **Mantine DataTable** - Fast setup, beautiful defaults, Mantine ecosystem
-> - **MUI DataGrid** - Dense mode for information-heavy views, MUI ecosystem
+> - **Mantine DataTable** - Fast setup, beautiful defaults, granular density control (5 levels)
+> - **MUI DataGrid** - Dense mode, column pinning, MUI ecosystem
 
 ---
 
