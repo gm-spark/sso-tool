@@ -557,6 +557,220 @@ def generate_nova_fast(data: pl.DataFrame, output_path: str):
 
 ---
 
+## 11. Database + Grid Pattern (Replace Pre-Generated Excel Files)
+
+### Problem
+
+The original approach generates 13 Excel files per run:
+- Slow: Must generate all files before "done" (~30-60 sec)
+- Inflexible: Users get fixed format, can't customize view
+- Storage heavy: ~6.5MB per run
+- No querying: Can't search/filter across historical runs
+
+### Solution
+
+Store results in database, display with data grid, export on demand:
+
+```
+BEFORE: Calculate → Generate 13 Excel files → Store files → User downloads
+
+AFTER:  Calculate → Store to DB → Display in Grid → Export on demand
+```
+
+### Benefits
+
+| Feature | File-Based | Database + Grid |
+|---------|------------|-----------------|
+| Time to "done" | 30-60 sec | 5-10 sec |
+| Storage per run | ~6.5 MB | ~1 MB |
+| Filter/sort results | Download, open Excel | Instant in browser |
+| Compare runs | Manual | Built-in diff view |
+| Search across runs | Impossible | SQL query |
+| Mobile friendly | No | Yes |
+
+### Database Schema
+
+```sql
+CREATE TABLE run_results (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    run_id UUID REFERENCES runs(id) ON DELETE CASCADE,
+    item_number INTEGER NOT NULL,
+    store_number INTEGER NOT NULL,
+    wos_weeks INTEGER NOT NULL,
+    avg_pos_quantity NUMERIC,
+    f4_pipe NUMERIC,
+    wos_target NUMERIC,
+    need NUMERIC,
+    whse_packs_distro INTEGER,
+    eaches_distro INTEGER,
+    retail_amount NUMERIC,
+    surplus NUMERIC,
+    included_in_output BOOLEAN DEFAULT TRUE,
+    UNIQUE(run_id, item_number, store_number, wos_weeks)
+);
+
+CREATE INDEX idx_results_run ON run_results(run_id);
+```
+
+---
+
+## 12. Data Grid Library Selection
+
+### Comparison of Free Options
+
+| Library | Excel Export | Virtual Scroll | Filtering | Sorting | License |
+|---------|--------------|----------------|-----------|---------|---------|
+| **TanStack Table** | + SheetJS | Yes | Yes | Yes | MIT (Free) |
+| **MUI DataGrid** | Pro only ($249/yr) | Yes | Yes | Yes | MIT (Community) |
+| **Mantine DataTable** | + SheetJS | Yes | Yes | Yes | MIT (Free) |
+| **Glide Data Grid** | + SheetJS | Yes (1M+ rows) | Yes | Yes | MIT (Free) |
+| **React Data Grid** | Yes | Yes | Yes | Yes | MIT (Free) |
+
+> **Note**: AG Grid Enterprise (~$1,000+/dev/year) is overkill for this use case.
+
+### Recommendation: TanStack Table + shadcn/ui + SheetJS
+
+```
+TanStack Table  →  Headless table logic (free, MIT)
+     +
+shadcn/ui       →  Beautiful, accessible components (free, MIT)
+     +
+SheetJS         →  Excel import/export (free, Apache 2.0)
+```
+
+**Why this stack:**
+- **$0 total cost** - All open source
+- **Full styling control** - Headless = works with any design system
+- **Next.js optimized** - Perfect App Router compatibility
+- **TypeScript first** - Excellent type safety
+- **Tiny bundle** - TanStack Table is ~15kb
+- **Virtualization** - Built-in support for large datasets
+- **Excel export** - SheetJS handles NOVA template format
+
+#### TanStack Table Example
+
+```typescript
+import {
+  useReactTable,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  getPaginationRowModel,
+  flexRender,
+} from '@tanstack/react-table';
+import * as XLSX from 'xlsx';
+
+function ResultsTable({ data }) {
+  const columns = [
+    { accessorKey: 'item_number', header: 'Item' },
+    { accessorKey: 'store_number', header: 'Store' },
+    { accessorKey: 'wos_weeks', header: 'WOS' },
+    { accessorKey: 'whse_packs_distro', header: 'Packs' },
+    { accessorKey: 'eaches_distro', header: 'Eaches' },
+    {
+      accessorKey: 'retail_amount',
+      header: 'Retail $',
+      cell: ({ getValue }) => `$${getValue().toFixed(2)}`
+    },
+  ];
+
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
+
+  const exportToExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Results');
+    XLSX.writeFile(wb, 'SSO_Results.xlsx');
+  };
+
+  return (
+    <>
+      <button onClick={exportToExcel}>Export to Excel</button>
+      <table>
+        {/* ... render table using flexRender ... */}
+      </table>
+    </>
+  );
+}
+```
+
+#### NOVA Template Export
+
+```typescript
+async function exportNovaFormat(data: any[], wos: number) {
+  // Load NOVA template
+  const response = await fetch('/templates/NOVA_template.xlsx');
+  const templateBuffer = await response.arrayBuffer();
+  const wb = XLSX.read(templateBuffer);
+
+  // Filter data for specific WOS
+  const wosData = data.filter(row => row.wos_weeks === wos);
+
+  // Format for NOVA: item, store, blank, packs, eaches, retail, wos
+  const novaData = wosData.map(row => ({
+    item: row.item_number,
+    store: row.store_number,
+    blank: '',
+    packs: row.whse_packs_distro,
+    eaches: row.eaches_distro,
+    retail: row.retail_amount,
+    wos: row.wos_weeks,
+  }));
+
+  // Write to template sheet starting at row 2
+  const ws = wb.Sheets['NOVA form'];
+  XLSX.utils.sheet_add_json(ws, novaData, { origin: 'A2', skipHeader: true });
+
+  XLSX.writeFile(wb, `NOVA_${wos}WOS.xlsx`);
+}
+```
+
+### Alternative: Mantine DataTable
+
+If you prefer a batteries-included approach with less setup, **Mantine DataTable** is an excellent alternative:
+
+```typescript
+import { DataTable } from 'mantine-datatable';
+
+function ResultsTable({ data }) {
+  return (
+    <DataTable
+      columns={[
+        { accessor: 'item_number', title: 'Item', sortable: true },
+        { accessor: 'store_number', title: 'Store', sortable: true },
+        { accessor: 'eaches_distro', title: 'Eaches', sortable: true },
+      ]}
+      records={data}
+      pagination
+      recordsPerPage={100}
+      sortable
+      highlightOnHover
+    />
+  );
+}
+```
+
+**Mantine DataTable Pros:**
+- Zero config, works out of the box
+- Beautiful default styling (Mantine design system)
+- Built-in row expansion, selection, infinite scroll
+- Great documentation
+
+**Mantine DataTable Cons:**
+- Requires Mantine UI as dependency
+- Less flexible styling if not using Mantine
+
+> **Decision**: Use TanStack Table if you want full control and minimal dependencies. Use Mantine DataTable if you want faster setup and are okay adopting Mantine UI.
+
+---
+
 ## Summary: Expected Performance Gains
 
 | Optimization | Impact | Effort |
@@ -566,10 +780,11 @@ def generate_nova_fast(data: pl.DataFrame, output_path: str):
 | Remove `.apply()` calls | 10-50x faster on those ops | Low |
 | Lazy loading | 50-80% less memory | Low |
 | Async file processing | 2-3x faster load | Low |
-| Parallel Excel generation | 3-4x faster export | Medium |
+| Database + Grid pattern | 5x faster "done", queryable results | Medium |
+| On-demand Excel export | Eliminates upfront file generation | Low |
 | Wake-up pattern | Eliminates cold start UX | Low |
 
-**Combined effect**: A calculation that takes 60 seconds with 2GB RAM could take 10 seconds with 500MB RAM.
+**Combined effect**: A calculation that takes 60 seconds with 2GB RAM could take 10 seconds with 500MB RAM, with instant result viewing.
 
 ---
 
@@ -579,13 +794,16 @@ def generate_nova_fast(data: pl.DataFrame, output_path: str):
 1. Vectorize WOS loop - biggest performance win
 2. Replace `.apply()` with vectorized operations
 3. Use Polars for core calculations
+4. Database storage for results (enables querying, comparison)
 
 ### Phase 2 (Should Have)
-4. Lazy loading for large files
-5. Backend wake-up pattern
-6. Progress streaming
+5. TanStack Table or Mantine DataTable for result display
+6. On-demand Excel export with SheetJS
+7. Lazy loading for large files
+8. Backend wake-up pattern
 
 ### Phase 3 (Nice to Have)
-7. Parallel Excel generation
-8. Smart file size routing
-9. Pre-computed static data caching
+9. Progress streaming for long calculations
+10. Smart file size routing
+11. Pre-computed static data caching
+12. Run comparison / diff view
