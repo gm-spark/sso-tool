@@ -361,17 +361,13 @@ Creates summary Excel across all WOS targets.
 #### `fetch_store_sales(supplier: str, department: int, weeks: list[int]) -> DataFrame`
 Queries store sales from database (replaces file upload).
 
-#### `fetch_sso_data(supplier: str, department: int) -> DataFrame`
-Queries SSO sales data from database.
-
-#### `fetch_demand_forecast(supplier: str, department: int, weeks: list[int]) -> DataFrame`
-Queries forecast data from database.
-
 #### `save_run_results(run_id: str, results: RunResults) -> None`
 Persists calculation results to database.
 
 #### `get_run_history(user_id: str, limit: int = 50) -> list[Run]`
 Retrieves past runs for display.
+
+> **Note**: SSO Sales and Demand Forecast are user uploads (not yet in database).
 
 ---
 
@@ -384,7 +380,7 @@ Retrieves past runs for display.
 │                                                                         │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌───────────────┐ │
 │  │ WMT Calendar│  │ Store Sales │  │  SSO Sales  │  │Demand Forecast│ │
-│  │  (static)   │  │ (database)  │  │ (database)  │  │  (database)   │ │
+│  │  (static)   │  │ (database)  │  │(user upload)│  │ (user upload) │ │
 │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └───────┬───────┘ │
 │         │                │                │                  │         │
 │         ▼                ▼                ▼                  ▼         │
